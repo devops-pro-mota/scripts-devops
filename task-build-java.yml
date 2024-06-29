@@ -1,0 +1,53 @@
+  steps:
+    #- task: Maven@3
+    #  displayName: 'Build'
+    #  inputs:
+    #    mavenPomFile: 'pom.xml'
+    #    goals: 'clean install'
+    #    options: '-Dmaven.test.skip=true'
+    #    publishJUnitResults: false
+    #    javaHomeOption: 'JDKVersion'
+    #    mavenVersionOption: 'Path'
+    #    mavenDirectory: '/app/maven/apache-maven-3.3.9_pwd'
+    #    mavenSetM2Home: false
+    #    mavenAuthenticateFeed: false
+    #    effectivePomSkip: false
+    #    sonarQubeRunAnalysis: false
+
+    - task: CmdLine@2
+      displayName: 'Build'
+      inputs:
+        script: |
+          JAVAVERSION=$(cat pom.xml | grep "<java.version>" | awk '{$1=$1};1')
+          if [ "$JAVAVERSION" = "<java.version>11</java.version>" ]; then
+            export JAVA_HOME="/app/jdk/jdk-11.0.12"
+            export PATH=$PATH:$JAVA_HOME/bin
+          else
+            if [ "${{ parameters.server }}" == "Container" ]; then
+              export JAVA_HOME="/app/jdk/jdk1.8.0_271"
+              export PATH=$PATH:$JAVA_HOME/bin
+            else
+              export JAVA_HOME="$(JAVA_HOME)"
+              export PATH=$PATH:$JAVA_HOME/bin
+            fi
+          fi
+
+          #export JAVA_HOME=$(JAVA_HOME)
+          #export PATH=$PATH:$JAVA_HOME/bin
+
+          export M2_HOME=/app/maven/apache-maven-3.3.9_pwd
+          export M2=$M2_HOME/bin
+
+          WAR=$(grep -o "<packaging>war" pom.xml)
+          JAR=$(grep -o "<packaging>jar" pom.xml)
+          EAR=$(grep -o "<packaging>ear" pom.xml)
+          if [ "$WAR" = "<packaging>war" ]; then 
+            mvn clean install package -P war -Dmaven.test.skip=false
+          elif [ "$JAR" = "<packaging>jar" ]; then
+            mvn clean install package -P jar -Dmaven.test.skip=true
+          elif [ "$EAR" = "<packaging>ear" ]; then
+            mvn clean install package -P ear -Dmaven.test.skip=true
+          else
+            mvn clean install -Dmaven.test.skip=true
+          fi
+        workingDirectory: '$(Build.Repository.LocalPath)'
